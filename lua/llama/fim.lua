@@ -175,9 +175,6 @@ end
 
 --- @param accept_type string
 function M.accept(accept_type)
-	if not M.hint_shown then
-		return false
-	end
 	M.hide()
 	keymaps.remove_keymaps()
 	local line = M.fim_data.line
@@ -209,6 +206,9 @@ function M.accept(accept_type)
 end
 
 function M.hide()
+	if not M.hint_shown then
+		return
+	end
 	M.hint_shown = false
 
 	local bufnr = vim.api.nvim_get_current_buf()

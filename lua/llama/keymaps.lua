@@ -22,10 +22,10 @@ end
 
 function M.remove_keymaps()
 	print("keymap removed")
-	vim.keymap.del("i", config.values.keymap_trigger, { buffer = true, silent = true })
-	vim.keymap.del("i", config.values.keymap_accept_full, { buffer = true, silent = true })
-	vim.keymap.del("i", config.values.keymap_accept_line, { buffer = true, silent = true })
-	vim.keymap.del("i", config.values.keymap_accept_word, { buffer = true, silent = true })
+	vim.keymap.del("i", config.values.keymap_trigger, { silent = true })
+	vim.keymap.del("i", config.values.keymap_accept_full, { silent = true })
+	vim.keymap.del("i", config.values.keymap_accept_line, { silent = true })
+	vim.keymap.del("i", config.values.keymap_accept_word, { silent = true })
 end
 
 return M
