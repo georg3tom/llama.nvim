@@ -2,7 +2,6 @@ local config = require("llama.config")
 
 local M = {}
 
-
 --- @param line number Cursor line position
 --- @param col number Cursor column position
 --- @param prev table Previous completion context
@@ -96,6 +95,12 @@ function M.chunk_similarity(c0, c1)
 	end
 
 	return 2.0 * common / (lines0 + lines1)
+end
+
+function M.preprocess_content(content)
+	-- remove trailing white space
+	content = content:gsub("[%s\n]+$", "")
+	return content
 end
 
 return M

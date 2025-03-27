@@ -2,10 +2,12 @@ local config = require("llama.config")
 local cache = require("llama.cache")
 local utils = require("llama.utils")
 local curl = require("plenary.curl")
+local keymaps = require("llama.keymaps")
 local json = vim.fn.json_encode
 
 local M = {
 	current_job = nil,
+	enabled = false,
 	hint_shown = false,
 	fim_data = {
 		line = 0,
@@ -28,9 +30,36 @@ function M.complete_inline(is_auto, use_cache)
 	return ""
 end
 
+function M.can_accept()
+	if M.enabled == false then
+		return false
+	end
+	return true
+end
+
+function M.can_fim(line, col)
+	local line_cur = vim.api.nvim_get_current_line() -- Get current line text
+
+	if line_cur == nil then
+		return false
+	end
+
+	-- Ensure cursor is at the end of the line
+	if col ~= #line_cur then
+		return false
+	end
+
+	-- Check if there is a non-space characterin the current line
+	if line_cur:match("^%s*$") then
+		return false
+	end
+
+	return true
+end
+
 function M.show()
 	M.hide()
-	if #M.fim_data.content == 0 then
+	if #M.fim_data.content == {} or M.enabled == false then
 		return
 	end
 	M.hint_shown = true
@@ -46,6 +75,7 @@ function M.show()
 		virt_lines = virt_lines,
 		virt_text_pos = "inline",
 	})
+	keymaps.create_keymaps()
 end
 
 --- @param is_auto boolean
@@ -55,6 +85,9 @@ function M.complete(is_auto, prev, use_cache)
 	local current_job = vim.loop.hrtime()
 	M.current_job = vim.deepcopy(current_job)
 	local line, col = unpack(vim.api.nvim_win_get_cursor(0))
+	if not M.can_fim(line, col) then
+		return
+	end
 	M.fim_data.line = line
 	M.fim_data.col = col
 	M.fim_data.line_cur = vim.fn.getline(line)
@@ -128,7 +161,11 @@ function M.server_callback(response, current_job)
 	end
 
 	if data.content then
-		M.fim_data.content = vim.split(data.content, "\n", { plain = true })
+		if not M.can_accept(data.content) then
+			return
+		end
+		local content = utils.preprocess_content(data.content)
+		M.fim_data.content = vim.split(content, "\n", { plain = true })
 		M.show()
 	else
 		M.fim_data.content = {}
@@ -138,29 +175,27 @@ end
 
 --- @param accept_type string
 function M.accept(accept_type)
-	M.hide()
-	if #M.fim_data.content == 0 then
-		return
+	if not M.hint_shown then
+		return false
 	end
+	M.hide()
+	keymaps.remove_keymaps()
 	local line = M.fim_data.line
 	local col = M.fim_data.col
 	local line_cur = M.fim_data.line_cur
 	local content = M.fim_data.content
 	if accept_type == "full" then
-		-- First line: combine current line with first content line
 		local first_line = content[1]
 
-		-- Overwrite the first line
-		-- vim.api.nvim_buf_set_lines(0, line - 1, line - 1, false, { first_line })
 		vim.api.nvim_buf_set_text(0, line - 1, col, line - 1, col, { first_line })
+		vim.api.nvim_win_set_cursor(0, { line, col + #first_line })
 
 		-- If there are more lines, insert them after the first line
 		if #content > 1 then
 			table.remove(content, 1)
 			vim.api.nvim_buf_set_lines(0, line, line, false, content)
+			vim.api.nvim_win_set_cursor(0, { line + #content, #content[#content] + 1 })
 		end
-
-		vim.api.nvim_win_set_cursor(0, { line + #content, #content[#content] + 1 })
 	end
 
 	-- Implement acceptance logic similar to Vim plugin
@@ -171,8 +206,6 @@ function M.accept(accept_type)
 	else -- full
 		-- Full completion acceptance logic
 	end
-
-	M.hide()
 end
 
 function M.hide()
