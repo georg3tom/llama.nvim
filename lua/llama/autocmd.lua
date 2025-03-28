@@ -17,7 +17,7 @@ function M.debounce_fim_complete()
 		100,
 		0,
 		vim.schedule_wrap(function()
-			fim.complete(true, {}, true)
+			fim.complete(true)
 		end)
 	)
 end

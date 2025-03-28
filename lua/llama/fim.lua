@@ -18,18 +18,6 @@ local M = {
 	ns_id = vim.api.nvim_create_namespace("fim_ns"),
 }
 
---- @param is_auto boolean
---- @param use_cache boolean
-function M.complete_inline(is_auto, use_cache)
-	if M.hint_shown and not is_auto then
-		M.hide()
-		return ""
-	end
-
-	M.complete(is_auto, {}, use_cache)
-	return ""
-end
-
 function M.can_accept()
 	if M.enabled == false then
 		return false
@@ -37,8 +25,10 @@ function M.can_accept()
 	return true
 end
 
+--- @param line integer  Current line number.
+--- @param col integer   Curretn column number.
 function M.can_fim(line, col)
-	local line_cur = vim.api.nvim_get_current_line() -- Get current line text
+	local line_cur = vim.api.nvim_buf_get_lines(0, line - 1, line, true)[1] -- Get current line text
 
 	if line_cur == nil then
 		return false
@@ -78,10 +68,8 @@ function M.show()
 	keymaps.create_keymaps()
 end
 
---- @param is_auto boolean
---- @param prev table
 --- @param use_cache boolean
-function M.complete(is_auto, prev, use_cache)
+function M.complete(use_cache)
 	local current_job = vim.loop.hrtime()
 	M.current_job = vim.deepcopy(current_job)
 	local line, col = unpack(vim.api.nvim_win_get_cursor(0))
@@ -92,7 +80,7 @@ function M.complete(is_auto, prev, use_cache)
 	M.fim_data.col = col
 	M.fim_data.line_cur = vim.fn.getline(line)
 
-	local ctx_local = utils.get_local_context(line, col, prev)
+	local ctx_local = utils.get_local_context(line, col)
 	local extra_ctx = {}
 
 	local request_body = json({
@@ -141,6 +129,11 @@ function M.complete(is_auto, prev, use_cache)
 					M.server_callback(response, current_job)
 				end)
 			end
+		end,
+		on_error = function(err)
+			vim.schedule(function()
+				print(err)
+			end)
 		end,
 	})
 end
