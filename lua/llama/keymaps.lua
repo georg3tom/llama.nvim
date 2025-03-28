@@ -2,7 +2,6 @@ local config = require("llama.config")
 
 M = {}
 function M.create_keymaps()
-	print("keymap created")
 	vim.keymap.set("i", config.values.keymap_trigger, function()
 		require("llama.fim").complete_inline(false, false)
 	end, { silent = true, expr = true })
@@ -21,7 +20,6 @@ function M.create_keymaps()
 end
 
 function M.remove_keymaps()
-	print("keymap removed")
 	vim.keymap.del("i", config.values.keymap_trigger, { silent = true })
 	vim.keymap.del("i", config.values.keymap_accept_full, { silent = true })
 	vim.keymap.del("i", config.values.keymap_accept_line, { silent = true })

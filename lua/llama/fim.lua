@@ -132,7 +132,7 @@ function M.complete(use_cache)
 		end,
 		on_error = function(err)
 			vim.schedule(function()
-				print(err)
+				print(err.message)
 			end)
 		end,
 	})
@@ -172,29 +172,21 @@ function M.accept(accept_type)
 	keymaps.remove_keymaps()
 	local line = M.fim_data.line
 	local col = M.fim_data.col
-	local line_cur = M.fim_data.line_cur
 	local content = M.fim_data.content
-	if accept_type == "full" then
-		local first_line = content[1]
+	local first_line = content[1]
 
-		vim.api.nvim_buf_set_text(0, line - 1, col, line - 1, col, { first_line })
-		vim.api.nvim_win_set_cursor(0, { line, col + #first_line })
-
-		-- If there are more lines, insert them after the first line
-		if #content > 1 then
-			table.remove(content, 1)
-			vim.api.nvim_buf_set_lines(0, line, line, false, content)
-			vim.api.nvim_win_set_cursor(0, { line + #content, #content[#content] + 1 })
-		end
-	end
-
-	-- Implement acceptance logic similar to Vim plugin
 	if accept_type == "word" then
-		-- Word acceptance logic
-	elseif accept_type == "line" then
-		-- Line acceptance logic
-	else -- full
-		-- Full completion acceptance logic
+		first_line = first_line:match("%s*(%S+)")
+	end
+	-- set the current line. default behaviour for accept_type == line
+	vim.api.nvim_buf_set_text(0, line - 1, col, line - 1, col, { first_line })
+	vim.api.nvim_win_set_cursor(0, { line, col + #first_line })
+
+	-- If there are more lines, insert them after the first line
+	if accept_type == "full" and #content > 1 then
+		table.remove(content, 1)
+		vim.api.nvim_buf_set_lines(0, line, line, false, content)
+		vim.api.nvim_win_set_cursor(0, { line + #content, #content[#content] + 1 })
 	end
 end
 
