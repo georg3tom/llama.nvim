@@ -1,6 +1,6 @@
 # Llama.nvim
 
-[wip] Lua rewrite of [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)
+[wip] Lua rewrite of [ggml-org/llama.vim](https://github.com/ggml-org/llama.vim)
 
 
 ## Prerequisites
