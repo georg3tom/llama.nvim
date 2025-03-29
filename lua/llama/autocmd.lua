@@ -14,7 +14,7 @@ function M.debounce_fim_complete()
 
 	M.timer = vim.loop.new_timer()
 	M.timer:start(
-		100,
+		300,
 		0,
 		vim.schedule_wrap(function()
 			fim.complete(true)
@@ -29,7 +29,6 @@ function M.create_autocmds()
 		vim.api.nvim_create_autocmd({ "CursorMovedI" }, {
 			group = group,
 			callback = function()
-				fim.enabled = true
 				if config.values.auto_fim then
 					require("llama.autocmd").debounce_fim_complete()
 				end
@@ -40,8 +39,11 @@ function M.create_autocmds()
 	vim.api.nvim_create_autocmd({ "InsertEnter", "InsertLeave" }, {
 		group = group,
 		callback = function(args)
+			if args.event == "InsertEnter" then
+				fim.can_show = true
+			end
 			if args.event == "InsertLeave" then
-				fim.enabled = false
+				fim.can_show = false
 				fim.hide()
 			end
 		end,

@@ -8,6 +8,7 @@ local json = vim.fn.json_encode
 local M = {
 	current_job = nil,
 	can_accept = false,
+	can_show = false,
 	hint_shown = false,
 	cache = cache.new(config.values.max_cache_keys),
 	fim_data = {
@@ -41,25 +42,35 @@ function M.can_fim(line, col)
 	return true
 end
 
-function M.show()
-	M.hide()
+function M._can_show()
+	if not M.can_show then
+		return false
+	end
+
 	if #M.fim_data.content == {} then
+		return false
+	end
+	return true
+end
+
+function M.show()
+	if not M._can_show() then
 		return
 	end
-	M.hint_shown = true
-	local line, col = unpack(vim.api.nvim_win_get_cursor(0)) -- Get cursor position
-	line = line - 1 -- Convert to 0-based index
+
+	M.hide()
 
 	local virt_lines = {}
 	for i = 2, #M.fim_data.content do
 		virt_lines[i - 1] = { { M.fim_data.content[i], "Comment" } }
 	end
-	vim.api.nvim_buf_set_extmark(0, M.ns_id, line, col, {
+	vim.api.nvim_buf_set_extmark(0, M.ns_id, M.fim_data.line - 1, M.fim_data.col, {
 		virt_text = { { M.fim_data.content[1], "Comment" } },
 		virt_lines = virt_lines,
 		virt_text_pos = "inline",
 	})
 	keymaps.create_keymaps()
+	M.hint_shown = true
 	M.can_accept = true
 end
 
