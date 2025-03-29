@@ -1,14 +1,15 @@
 local config = require("llama.config")
-local cache = require("llama.cache")
 local utils = require("llama.utils")
 local curl = require("plenary.curl")
 local keymaps = require("llama.keymaps")
+local cache = require("llama.cache")
 local json = vim.fn.json_encode
 
 local M = {
 	current_job = nil,
-	enabled = false,
+	can_accept = false,
 	hint_shown = false,
+	cache = cache.new(config.values.max_cache_keys),
 	fim_data = {
 		line = 0,
 		col = 0,
@@ -18,17 +19,10 @@ local M = {
 	ns_id = vim.api.nvim_create_namespace("fim_ns"),
 }
 
-function M.can_accept()
-	if M.enabled == false then
-		return false
-	end
-	return true
-end
-
 --- @param line integer  Current line number.
---- @param col integer   Curretn column number.
+--- @param col integer   Current column number.
 function M.can_fim(line, col)
-	local line_cur = vim.api.nvim_buf_get_lines(0, line - 1, line, true)[1] -- Get current line text
+	local line_cur = vim.api.nvim_buf_get_lines(0, line - 1, line, true)[1]
 
 	if line_cur == nil then
 		return false
@@ -49,7 +43,7 @@ end
 
 function M.show()
 	M.hide()
-	if #M.fim_data.content == {} or M.enabled == false then
+	if #M.fim_data.content == {} then
 		return
 	end
 	M.hint_shown = true
@@ -66,10 +60,12 @@ function M.show()
 		virt_text_pos = "inline",
 	})
 	keymaps.create_keymaps()
+	M.can_accept = true
 end
 
 --- @param use_cache boolean
 function M.complete(use_cache)
+	M.hide()
 	local current_job = vim.loop.hrtime()
 	M.current_job = vim.deepcopy(current_job)
 	local line, col = unpack(vim.api.nvim_win_get_cursor(0))
@@ -80,14 +76,23 @@ function M.complete(use_cache)
 	M.fim_data.col = col
 	M.fim_data.line_cur = vim.fn.getline(line)
 
-	local ctx_local = utils.get_local_context(line, col)
+	local local_ctx = utils.get_local_context(line, col)
 	local extra_ctx = {}
 
+	if use_cache then
+		local cached_result = M.cache:get_cached_completion(local_ctx)
+		if cached_result then
+			M.fim_data.content = vim.split(cached_result, "\n", { plain = true })
+			M.show()
+			return
+		end
+	end
+
 	local request_body = json({
-		input_prefix = ctx_local.prefix,
-		input_suffix = ctx_local.suffix,
+		input_prefix = local_ctx.prefix,
+		input_suffix = local_ctx.suffix,
 		input_extra = extra_ctx,
-		prompt = ctx_local.middle,
+		prompt = local_ctx.middle,
 		n_predict = config.values.n_predict,
 		n_indent = config.values.indent,
 		top_k = 40,
@@ -99,16 +104,6 @@ function M.complete(use_cache)
 		t_max_predict_ms = config.values.t_max_predict_ms,
 		response_fields = {
 			"content",
-			"timings/prompt_n",
-			"timings/prompt_ms",
-			"timings/prompt_per_token_ms",
-			"timings/prompt_per_second",
-			"timings/predicted_n",
-			"timings/predicted_ms",
-			"timings/predicted_per_token_ms",
-			"timings/predicted_per_second",
-			"truncated",
-			"tokens_cached",
 		},
 	})
 
@@ -126,7 +121,7 @@ function M.complete(use_cache)
 		callback = function(response)
 			if M.server_callback then
 				vim.schedule(function()
-					M.server_callback(response, current_job)
+					M.server_callback(local_ctx, response, current_job)
 				end)
 			end
 		end,
@@ -138,26 +133,19 @@ function M.complete(use_cache)
 	})
 end
 
-function M.server_callback(response, current_job)
-	if current_job ~= M.current_job then
-		return
-	end
-	if response.status ~= 200 then
-		print("Error: HTTP " .. response.status)
-		return
-	end
-
+function M.server_callback(local_ctx, response, current_job)
 	local ok, data = pcall(vim.fn.json_decode, response.body)
 	if not ok then
 		print("Failed to parse JSON response")
 		return
 	end
-
-	if data.content then
-		if not M.can_accept(data.content) then
+	local content = data.content
+	content = utils.preprocess_content(content)
+	if content then
+		M.cache:add(local_ctx, content)
+		if current_job ~= M.current_job then
 			return
 		end
-		local content = utils.preprocess_content(data.content)
 		M.fim_data.content = vim.split(content, "\n", { plain = true })
 		M.show()
 	else
@@ -168,8 +156,9 @@ end
 
 --- @param accept_type string
 function M.accept(accept_type)
-	M.hide()
-	keymaps.remove_keymaps()
+	if not M.can_accept then
+		return
+	end
 	local line = M.fim_data.line
 	local col = M.fim_data.col
 	local content = M.fim_data.content
@@ -188,13 +177,16 @@ function M.accept(accept_type)
 		vim.api.nvim_buf_set_lines(0, line, line, false, content)
 		vim.api.nvim_win_set_cursor(0, { line + #content, #content[#content] + 1 })
 	end
+	M.hide()
 end
 
 function M.hide()
 	if not M.hint_shown then
 		return
 	end
+	keymaps.remove_keymaps()
 	M.hint_shown = false
+	M.can_accept = false
 
 	local bufnr = vim.api.nvim_get_current_buf()
 	vim.api.nvim_buf_clear_namespace(bufnr, M.ns_id, 0, -1)
