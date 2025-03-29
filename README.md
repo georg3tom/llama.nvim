@@ -1,16 +1,22 @@
-# Llama.nvim
+# llama.nvim
 
-[wip] Lua rewrite of [ggml-org/llama.vim](https://github.com/ggml-org/llama.vim)
-
+[wip] A Neovim plugin that provides local LLM-powered code completion. This is a Lua rewrite of [ggml-org/llama.vim](https://github.com/ggml-org/llama.vim).
 
 ## Prerequisites
 
 - Neovim 0.9+
 - A running local LLM server (e.g., llama.cpp) check [here](https://github.com/ggml-org/llama.vim?tab=readme-ov-file#llamacpp-setup)
 
+## Features
+
+- [x] LRU caching of requests
+- [ ] Treesitter based extra context
+- [ ] Play nicely with blink.cmp and other plugins
+- [ ] Profiling
+
 ## Installation
 
-Lazy.nvim setup
+### Lazy.nvim
 
 ```lua
 {
@@ -27,7 +33,23 @@ Lazy.nvim setup
 }
 ```
 
+### Packer
+
+```lua
+use {
+    'georg3tom/llama.nvim',
+    requires = { 'nvim-lua/plenary.nvim' },
+    config = function()
+        require('llama').setup({
+            -- Your configuration options here
+        })
+    end
+}
+```
+
 ## Configuration
+
+The plugin can be configured with the following options:
 
 ```lua
 require('llama').setup({
@@ -37,6 +59,7 @@ require('llama').setup({
     n_suffix = 64,                              -- Lines of context after cursor
     n_predict = 128,                            -- Maximum tokens to predict
     auto_fim = true,                            -- Auto-trigger completion
+	max_cache_keys = 250,                       -- Size of the cache
     keymap_trigger = '<C-F>',                   -- Trigger completion keymap
     keymap_accept_full = '<Tab>',               -- Accept full completion
     keymap_accept_line = '<S-Tab>',             -- Accept line completion
@@ -46,12 +69,14 @@ require('llama').setup({
 
 ## Usage
 
-- `<C-F>`: Trigger completion
-- `<Tab>`: Accept full completion
-<!-- - `<S-Tab>`: Accept line completion
-- `<C-B>`: Accept word completion -->
+### Keymaps
 
-### Commands
+- `<C-F>`: Trigger completion manually
+- `<Tab>`: Accept the full completion
+- `<S-Tab>`: Accept line completion
+- `<C-B>`: Accept word completion
+
+### [wip]Commands
 
 - `:LlamaEnable`: Enable the plugin
 - `:LlamaDisable`: Disable the plugin
