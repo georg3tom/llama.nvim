@@ -67,6 +67,9 @@ function M.chunk_similarity(c0, c1)
 end
 
 function M.preprocess_content(content)
+	if content == nil or content:match("^%s*$") ~= nil then
+		return nil
+	end
 	-- remove trailing white space
 	content = content:gsub("[%s\n]+$", "")
 	return content
