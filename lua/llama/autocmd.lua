@@ -70,4 +70,8 @@ function M.create_autocmds()
 	})
 end
 
+function M.remove_autocmds()
+	vim.api.nvim_clear_autocmds({ group = "LlamaCompletion" })
+end
+
 return M
