@@ -14,7 +14,7 @@ function M.debounce_fim_complete()
 
 	M.timer = vim.loop.new_timer()
 	M.timer:start(
-		300,
+		100,
 		0,
 		vim.schedule_wrap(function()
 			fim.complete(true)
@@ -30,6 +30,7 @@ function M.create_autocmds()
 			group = group,
 			callback = function()
 				if config.values.auto_fim then
+					fim.hide()
 					require("llama.autocmd").debounce_fim_complete()
 				end
 			end,

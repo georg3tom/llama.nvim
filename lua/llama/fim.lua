@@ -3,6 +3,7 @@ local utils = require("llama.utils")
 local curl = require("plenary.curl")
 local keymaps = require("llama.keymaps")
 local cache = require("llama.cache")
+local logger = require("llama.logger")
 local json = vim.fn.json_encode
 
 local M = {
@@ -138,7 +139,7 @@ function M.complete(use_cache)
 		end,
 		on_error = function(err)
 			vim.schedule(function()
-				print(err.message)
+				logger.error(err.message)
 			end)
 		end,
 	})
@@ -147,7 +148,7 @@ end
 function M.server_callback(local_ctx, response, current_job)
 	local ok, data = pcall(vim.fn.json_decode, response.body)
 	if not ok then
-		print("Failed to parse JSON response")
+		logger.warn("Failed to parse JSON response")
 		return
 	end
 	local content = data.content
@@ -161,7 +162,7 @@ function M.server_callback(local_ctx, response, current_job)
 		M.show()
 	else
 		M.fim_data.content = {}
-		print("No content in response")
+		logger.info("No content in response")
 	end
 end
 
@@ -199,8 +200,7 @@ function M.hide()
 	M.hint_shown = false
 	M.can_accept = false
 
-	local bufnr = vim.api.nvim_get_current_buf()
-	vim.api.nvim_buf_clear_namespace(bufnr, M.ns_id, 0, -1)
+	vim.api.nvim_buf_clear_namespace(0, M.ns_id, 0, -1)
 end
 
 return M

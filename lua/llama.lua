@@ -1,6 +1,7 @@
 local config = require("llama.config")
 local fim = require("llama.fim")
 local autocmd = require("llama.autocmd")
+local logger = require("llama.logger")
 
 local M = {}
 
@@ -13,6 +14,7 @@ function M.setup(user_config)
 end
 
 function M.create_commands()
+	vim.api.nvim_create_user_command("LlamaInfo", logger.show, {})
 	vim.api.nvim_create_user_command("LlamaEnable", M.setup, {})
 	vim.api.nvim_create_user_command("LlamaDisable", function()
 		M.enabled = false

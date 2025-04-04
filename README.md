@@ -81,3 +81,4 @@ require('llama').setup({
 - `:LlamaEnable`: Enable the plugin
 - `:LlamaDisable`: Disable the plugin
 - `:LlamaToggle`: Toggle the plugin
+- `:LlamaInfo`: Show logs
