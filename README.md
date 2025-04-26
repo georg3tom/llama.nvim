@@ -59,7 +59,7 @@ require('llama').setup({
     n_suffix = 64,                              -- Lines of context after cursor
     n_predict = 128,                            -- Maximum tokens to predict
     auto_fim = true,                            -- Auto-trigger completion
-	max_cache_keys = 250,                       -- Size of the cache
+    max_cache_keys = 250,                       -- Size of the cache
     keymap_trigger = '<C-F>',                   -- Trigger completion keymap
     keymap_accept_full = '<Tab>',               -- Accept full completion
     keymap_accept_line = '<S-Tab>',             -- Accept line completion
