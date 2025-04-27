@@ -1,6 +1,6 @@
 # llama.nvim
 
-[wip] A Neovim plugin that provides local LLM-powered code completion. This is a Lua rewrite of [ggml-org/llama.vim](https://github.com/ggml-org/llama.vim).
+A Neovim plugin that provides local LLM-powered code completion. This is a Lua rewrite of [ggml-org/llama.vim](https://github.com/ggml-org/llama.vim).
 
 ## Prerequisites
 
@@ -21,7 +21,6 @@
 ```lua
 {
     'georg3tom/llama.nvim',
-    dependencies = { 'nvim-lua/plenary.nvim' },
     config = function()
         require('llama').setup({
             -- Your configuration options here
@@ -38,7 +37,6 @@
 ```lua
 use {
     'georg3tom/llama.nvim',
-    requires = { 'nvim-lua/plenary.nvim' },
     config = function()
         require('llama').setup({
             -- Your configuration options here
@@ -53,7 +51,7 @@ The plugin can be configured with the following options:
 
 ```lua
 require('llama').setup({
-    endpoint = 'http://127.0.0.1:8012/infill',  -- LLM server endpoint
+    endpoint = '127.0.0.1:8012/infill',  -- LLM server endpoint
     api_key = '',                               -- Optional API key
     n_prefix = 256,                             -- Lines of context before cursor
     n_suffix = 64,                              -- Lines of context after cursor
@@ -76,7 +74,7 @@ require('llama').setup({
 - `<S-Tab>`: Accept line completion
 - `<C-B>`: Accept word completion
 
-### [wip]Commands
+### Commands
 
 - `:LlamaEnable`: Enable the plugin
 - `:LlamaDisable`: Disable the plugin
