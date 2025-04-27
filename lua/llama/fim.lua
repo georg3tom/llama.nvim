@@ -1,20 +1,26 @@
 local config = require("llama.config")
 local utils = require("llama.utils")
-local curl = require("plenary.curl")
+local http = require("llama.http")
 local keymaps = require("llama.keymaps")
 local cache = require("llama.cache")
 local logger = require("llama.logger")
 local json = vim.fn.json_encode
+local ring_context = require("llama.extra_context.ring_context")
+
+-- Initialize ring context
+ring_context.setup()
 
 local M = {}
 
 -- Private state
 ---@type number|nil
 local last_job = nil
+---@type number|nil
+local current_job = nil
 ---@type boolean
-local extra_ctx = {}
 local hint_shown = false
 local fim_cache = cache.new(config.values.max_cache_keys)
+local timer = nil
 local fim_data = {
   line = 0,
   col = 0,
@@ -80,7 +86,7 @@ local function show()
   hint_shown = true
 end
 
-local function server_callback(local_ctx, response, current_job)
+local server_callback = vim.schedule_wrap(function(local_ctx, response)
   local ok, data = pcall(vim.fn.json_decode, response.body)
   if not ok then
     logger.warn("Failed to parse JSON response")
@@ -97,13 +103,9 @@ local function server_callback(local_ctx, response, current_job)
   end
 
   fim_cache:add(local_ctx, content)
-  if last_job ~= current_job then
-    return
-  end
-
   fim_data.content = vim.split(content, "\n", { plain = true })
   show()
-end
+end)
 
 -- Public API
 M.can_show = false
@@ -138,11 +140,32 @@ function M.accept(accept_type)
   M.hide()
 end
 
+---debounce wrapper around complete()
+---@param use_cache boolean Whether to use cached results if available
+function M.debounce_complete(use_cache)
+  if M.timer then
+    M.timer:stop()
+    M.timer:close()
+  end
+
+  M.timer = vim.loop.new_timer()
+  M.timer:start(100, 0, function()
+    vim.schedule(function()
+      M.complete(use_cache)
+    end)
+  end)
+end
+
 ---Completes the FIM request, either using cache or making a new request
 ---@param use_cache boolean Whether to use cached results if available
 function M.complete(use_cache)
   M.hide()
-  last_job = vim.loop.hrtime()
+
+  if current_job then
+    current_job:kill(15)
+    current_job = nil
+  end
+
   local line, col = unpack(vim.api.nvim_win_get_cursor(0))
   if not can_fim(line, col) then
     return
@@ -162,6 +185,7 @@ function M.complete(use_cache)
     end
   end
 
+  local extra_ctx = ring_context.extra_ctx
   local request_body = json({
     input_prefix = local_ctx.prefix,
     input_suffix = local_ctx.suffix,
@@ -189,20 +213,19 @@ function M.complete(use_cache)
     headers["Authorization"] = "Bearer " .. config.values.api_key
   end
 
-  curl.post(config.values.endpoint, {
-    body = request_body,
-    headers = headers,
-    callback = function(response)
-      vim.schedule(function()
-        server_callback(local_ctx, response, last_job)
-      end)
+  current_job = http.post(
+    config.values.endpoint,
+    request_body,
+    headers,
+    function(response)
+      server_callback(local_ctx, response)
     end,
-    on_error = function(err)
+    function(err)
       vim.schedule(function()
         logger.error(err.message)
       end)
-    end,
-  })
+    end
+  )
 end
 
 ---Hides the FIM hint and cleans up related resources
