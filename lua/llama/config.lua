@@ -1,7 +1,7 @@
 local M = {}
 
 M.values = {
-  endpoint = "192.168.1.190:8012/infill",
+  endpoint = "127.0.0.1:8012/infill",
   api_key = "",
   n_prefix = 256,
   n_suffix = 64,

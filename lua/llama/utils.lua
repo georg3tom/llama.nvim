@@ -39,34 +39,6 @@ function M.get_local_context(line, col)
   return ctx
 end
 
---- @param text table Lines of text
---- @param do_evict boolean Evict similar chunks
-function M.pick_chunk(text, no_mod, do_evict)
-  -- Similar implementation to Vim plugin's pick_chunk function
-  -- Handles chunk selection, caching, and context management
-end
-
---- Compute chunk similarity
---- @param c0 table First chunk of text
---- @param c1 table Second chunk of text
---- @return number Similarity score (0-1)
-function M.chunk_similarity(c0, c1)
-  local lines0 = #c0
-  local lines1 = #c1
-  local common = 0
-
-  for _, line0 in ipairs(c0) do
-    for _, line1 in ipairs(c1) do
-      if line0 == line1 then
-        common = common + 1
-        break
-      end
-    end
-  end
-
-  return 2.0 * common / (lines0 + lines1)
-end
-
 function M.preprocess_content(content)
   if content == nil or content:match("^%s*$") ~= nil then
     return nil
