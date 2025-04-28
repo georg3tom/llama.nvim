@@ -1,7 +1,5 @@
 local config = require("llama.config")
 local fim = require("llama.fim")
-local utils = require("llama.utils")
-local logger = require("llama.logger")
 
 local M = {}
 
