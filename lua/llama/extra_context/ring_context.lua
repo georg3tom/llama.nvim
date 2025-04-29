@@ -20,20 +20,37 @@ local pos_y_pick = -1 -- last y where we picked a chunk
 ---@param c1 string[] Second chunk of text
 ---@return number Similarity score between 0 and 1
 local function chunk_sim(c0, c1)
-  local lines0 = #c0
-  local lines1 = #c1
-  local common = 0
+  local c0_len = #c0
+  local c1_len = #c1
+  if c0_len > c1_len then
+    c0, c1 = c1, c0
+  end
 
-  for _, line0 in ipairs(c0) do
-    for _, line1 in ipairs(c1) do
-      if line0 == line1 then
-        common = common + 1
-        break
-      end
+  -- Early exit for very different sized chunks
+  local size_ratio = c0_len / c1_len
+  if size_ratio < 0.5 then
+    return 0
+  end
+
+  local set0 = {}
+  local set1 = {}
+  local common = 0
+  for _, line in ipairs(c0) do
+    set0[line] = true
+  end
+  for _, line in ipairs(c1) do
+    set1[line] = true
+  end
+
+  for line in pairs(set0) do
+    if set1[line] then
+      common = common + 1
     end
   end
 
-  return 2.0 * common / (lines0 + lines1)
+  -- Calculate Jaccard similarity
+  local union = c0_len + c1_len - common
+  return union > 0 and common / union or 0
 end
 
 ---Picks a random chunk of text and queues it for processing
@@ -80,39 +97,31 @@ local function pick_chunk(text, no_mod, do_evict)
 
   local chunk_str = table.concat(chunk, "\n") .. "\n"
 
-  -- Check for existing chunks
-  local exist = false
-  for i = 1, #ring_chunks do
-    if vim.deep_equal(ring_chunks[i].data, chunk) then
-      exist = true
-      break
-    end
-  end
-
-  for i = 1, #ring_queued do
-    if vim.deep_equal(ring_queued[i].data, chunk) then
-      exist = true
-      break
-    end
-  end
-
-  if exist then
-    return
-  end
-
-  -- Evict similar chunks if requested
+  -- evict similar chunks if requested
   if do_evict then
     for i = #ring_queued, 1, -1 do
-      if chunk_sim(ring_queued[i].data, chunk) > 0.9 then
+      if chunk_sim(ring_queued[i].data, chunk) > 0.5 then
         table.remove(ring_queued, i)
         ring_n_evict = ring_n_evict + 1
       end
     end
 
     for i = #ring_chunks, 1, -1 do
-      if chunk_sim(ring_chunks[i].data, chunk) > 0.9 then
+      if chunk_sim(ring_chunks[i].data, chunk) > 0.5 then
         table.remove(ring_chunks, i)
         ring_n_evict = ring_n_evict + 1
+      end
+    end
+  else
+    -- return if chunk is simliar and we are not evicting
+    for i = #ring_queued, 1, -1 do
+      if chunk_sim(ring_queued[i].data, chunk) > 0.5 then
+        return
+      end
+    end
+    for i = #ring_chunks, 1, -1 do
+      if chunk_sim(ring_chunks[i].data, chunk) > 0.5 then
+        return
       end
     end
   end
@@ -153,7 +162,7 @@ local function ring_update()
   -- Skip update if not in normal mode or cursor recently moved
   if
     vim.api.nvim_get_mode().mode ~= "n"
-    and vim.fn.reltimefloat(vim.fn.reltime(t_last_move)) < 3.0
+    or vim.fn.reltimefloat(vim.fn.reltime(t_last_move)) < 3.0
   then
     return
   end
@@ -203,6 +212,34 @@ local function ring_update()
   end)
 end
 
+---Gathers context chunks around the current cursor position
+function M.gather_context()
+  local pos_y = vim.fn.line(".")
+  local delta_y = math.abs(pos_y - pos_y_pick)
+
+  -- Only gather chunks if cursor has moved significantly
+  if delta_y > 32 then
+    local max_y = vim.fn.line("$")
+
+    -- Expand prefix context
+    local prefix_start = math.max(1, pos_y - config.values.ring_scope)
+    local prefix_end = math.max(1, pos_y - config.values.n_prefix)
+    local prefix_lines =
+      vim.api.nvim_buf_get_lines(0, prefix_start - 1, prefix_end, false)
+    pick_chunk(prefix_lines, false, false)
+
+    -- Gather suffix context
+    local suffix_start = math.min(max_y, pos_y + config.values.n_suffix)
+    local suffix_end =
+      math.min(max_y, pos_y + config.values.n_suffix + config.values.ring_chunk_size)
+    local suffix_lines =
+      vim.api.nvim_buf_get_lines(0, suffix_start - 1, suffix_end, false)
+    pick_chunk(suffix_lines, false, false)
+
+    pos_y_pick = pos_y
+  end
+end
+
 ---Sets up autocommands for context gathering
 local function setup_autocommands()
   local group = vim.api.nvim_create_augroup("LlamaContextGather", { clear = true })
@@ -212,34 +249,6 @@ local function setup_autocommands()
     group = group,
     callback = function()
       t_last_move = vim.fn.reltime()
-
-      -- Get current cursor position
-      local pos_y = vim.fn.line(".")
-      local delta_y = math.abs(pos_y - pos_y_pick)
-
-      -- Only gather chunks if cursor has moved significantly
-      if delta_y > 32 then
-        local max_y = vim.fn.line("$")
-
-        -- Expand prefix context
-        local prefix_start = math.max(1, pos_y - config.values.ring_scope)
-        local prefix_end = math.max(1, pos_y - config.values.n_prefix)
-        local prefix_lines =
-          vim.api.nvim_buf_get_lines(0, prefix_start - 1, prefix_end, false)
-        pick_chunk(prefix_lines, false, false)
-
-        -- Gather suffix context
-        local suffix_start = math.min(max_y, pos_y + config.values.n_suffix)
-        local suffix_end = math.min(
-          max_y,
-          pos_y + config.values.n_suffix + config.values.ring_chunk_size
-        )
-        local suffix_lines =
-          vim.api.nvim_buf_get_lines(0, suffix_start - 1, suffix_end, false)
-        pick_chunk(suffix_lines, false, false)
-
-        pos_y_pick = pos_y
-      end
     end,
   })
 
@@ -270,7 +279,6 @@ local function setup_autocommands()
   })
 end
 
----Initializes the ring context system
 function M.setup()
   ring_chunks = {}
   ring_queued = {}

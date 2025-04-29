@@ -90,6 +90,7 @@ local function show()
   })
   keymaps.create_keymaps()
   hint_shown = true
+  ring_context.gather_context()
 end
 
 local server_callback = vim.schedule_wrap(function(local_ctx, response)
