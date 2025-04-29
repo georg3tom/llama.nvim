@@ -35,8 +35,14 @@ local ns_id = vim.api.nvim_create_namespace("fim_ns")
 ---@param col number The column number to check
 ---@return boolean True if FIM can be performed, false otherwise
 local function can_fim(line, col)
-  local line_cur = vim.api.nvim_buf_get_lines(0, line - 1, line, true)[1]
+  local file_path = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
 
+  -- If the buffer is readonly or has an associated with a local file path
+  if vim.bo.readonly or file_path == "" then
+    return false
+  end
+
+  local line_cur = vim.api.nvim_buf_get_lines(0, line - 1, line, true)[1]
   if line_cur == nil then
     return false
   end
