@@ -24,6 +24,7 @@ local function chunk_sim(c0, c1)
   local c1_len = #c1
   if c0_len > c1_len then
     c0, c1 = c1, c0
+    c0_len, c1_len = c1_len, c0_len
   end
 
   -- Early exit for very different sized chunks
@@ -50,7 +51,7 @@ local function chunk_sim(c0, c1)
 
   -- Calculate Jaccard similarity
   local union = c0_len + c1_len - common
-  return union > 0 and common / union or 0
+  return common / union
 end
 
 ---Picks a random chunk of text and queues it for processing
