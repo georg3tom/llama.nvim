@@ -130,7 +130,7 @@ function M.accept(accept_type)
   local first_line = content[1]
 
   if accept_type == "word" then
-    first_line = first_line:match("%s*(%S+)")
+    first_line = first_line:match("^(%s*%S+)")
   end
   -- set the current line. default behaviour for accept_type == line
   if first_line then
