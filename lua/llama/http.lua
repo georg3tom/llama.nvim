@@ -24,7 +24,7 @@ function M.post(url, body, headers, callback, on_error)
     "-d",
     body,
     url,
-    unpack(header_args)
+    unpack(header_args),
   }
 
   -- Execute curl command
@@ -44,4 +44,5 @@ function M.post(url, body, headers, callback, on_error)
   return job_id
 end
 
-return M 
+return M
+

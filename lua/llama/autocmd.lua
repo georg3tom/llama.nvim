@@ -10,7 +10,6 @@ function M.create_autocmds()
     group = group,
     callback = function()
       if config.values.auto_fim then
-        fim.hide()
         fim.debounce_complete(true)
       end
     end,

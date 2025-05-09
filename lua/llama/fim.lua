@@ -53,9 +53,9 @@ local function can_fim(line, col)
   -- end
 
   -- Check if there is a non-space characterin the current line
-  if line_cur:match("^%s*$") then
-    return false
-  end
+  -- if line_cur:match("^%s*$") then
+  --   return false
+  -- end
 
   return true
 end
@@ -65,7 +65,7 @@ local function _can_show()
     return false
   end
 
-  if #fim_data.content == {} then
+  if #fim_data.content == 0 then
     return false
   end
   return true
@@ -73,11 +73,10 @@ end
 
 ---Shows the FIM hint with virtual text
 local function show()
+  M.hide()
   if not _can_show() then
     return
   end
-
-  M.hide()
 
   local virt_lines = {}
   for i = 2, #fim_data.content do
@@ -101,7 +100,7 @@ local server_callback = vim.schedule_wrap(function(local_ctx, response)
   end
 
   local content = data.content
-  content = utils.preprocess_content(content)
+  content = utils.preprocess_content(content, local_ctx.indent)
 
   if not content then
     fim_data.content = {}
@@ -147,39 +146,89 @@ function M.accept(accept_type)
   M.hide()
 end
 
+---Checks if the current input matches the existing completion
+---@param line number The current line number
+---@param col number The current column number
+---@return boolean True if the input matches and was handled, false otherwise
+local function check_input_match(line, col)
+  -- Early return if no completion content available
+  if #fim_data.content == 0 then
+    return false
+  end
+
+  local current_line = vim.fn.getline(line)
+  local prev_line, prev_col = fim_data.line, fim_data.col
+
+  -- Handle movement to next line
+  if line == prev_line + 1 and fim_data.content[1] == "" then
+    table.remove(fim_data.content, 1)
+
+    if #fim_data.content == 0 then
+      return false
+    end
+
+    -- Check if text before cursor matches prediction start
+    local text_before_cursor = current_line:sub(1, col)
+    if #text_before_cursor > 0 then
+      local completion_prefix = fim_data.content[1]:sub(1, #text_before_cursor)
+      if text_before_cursor ~= completion_prefix then
+        return false
+      end
+      fim_data.content[1] = fim_data.content[1]:sub(#text_before_cursor + 1)
+    end
+
+    -- Update tracking data
+    fim_data.line, fim_data.col, fim_data.line_cur = line, col, current_line
+    show()
+    return true
+  end
+
+  -- Handle cursor movement within same line
+  if line ~= prev_line or col <= prev_col then
+    return false
+  end
+
+  local added_text = current_line:sub(prev_col + 1, col)
+  local completion_prefix = fim_data.content[1]:sub(1, #added_text)
+
+  if added_text ~= completion_prefix then
+    return false
+  end
+
+  fim_data.content[1] = fim_data.content[1]:sub(#added_text + 1)
+
+  fim_data.line, fim_data.col, fim_data.line_cur = line, col, current_line
+
+  -- Handle completion of current segment
+  if fim_data.content[1] == "" then
+    if #fim_data.content == 1 then
+      fim_data.content = {}
+      return false
+    end
+    table.remove(fim_data.content, 1)
+  end
+
+  show()
+  return true
+end
+
 ---debounce wrapper around complete()
 ---@param use_cache boolean Whether to use cached results if available
 function M.debounce_complete(use_cache)
-  if M.timer then
-    M.timer:stop()
-    M.timer:close()
-  end
-
-  M.timer = vim.loop.new_timer()
-  M.timer:start(100, 0, function()
-    vim.schedule(function()
-      M.complete(use_cache)
-    end)
-  end)
-end
-
----Completes the FIM request, either using cache or making a new request
----@param use_cache boolean Whether to use cached results if available
-function M.complete(use_cache)
-  M.hide()
-
-  if current_job then
-    current_job:kill(15)
-    current_job = nil
-  end
-
+  -- check if the input matches the current completion
   local line, col = unpack(vim.api.nvim_win_get_cursor(0))
   if not can_fim(line, col) then
     return
   end
+
+  if check_input_match(line, col) then
+    return
+  end
+
   fim_data.line = line
   fim_data.col = col
   fim_data.line_cur = vim.fn.getline(line)
+  fim_data.content = {}
 
   local local_ctx = utils.get_local_context(line, col)
 
@@ -192,6 +241,29 @@ function M.complete(use_cache)
     end
   end
 
+  if M.timer then
+    M.timer:stop()
+    M.timer:close()
+  end
+
+  M.timer = vim.loop.new_timer()
+  M.timer:start(100, 0, function()
+    vim.schedule(function()
+      M.complete(local_ctx)
+    end)
+  end)
+end
+
+---Completes the FIM request, either using cache or making a new request
+---@param local_ctx table the local ctx
+function M.complete(local_ctx)
+  M.hide()
+
+  if current_job then
+    current_job:kill(15)
+    current_job = nil
+  end
+
   local extra_ctx = ring_context.extra_ctx
   local request_body = json({
     input_prefix = local_ctx.prefix,
@@ -199,7 +271,7 @@ function M.complete(use_cache)
     input_extra = extra_ctx,
     prompt = local_ctx.middle,
     n_predict = config.values.n_predict,
-    n_indent = config.values.indent,
+    n_indent = local_ctx.indent,
     top_k = 40,
     top_p = 0.90,
     stream = false,
