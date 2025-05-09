@@ -3,7 +3,7 @@ local config = require("llama.config")
 local M = {}
 function M.create_keymaps()
   vim.keymap.set("i", config.values.keymap_trigger, function()
-    require("llama.fim").complete(false)
+    require("llama.fim").complete()
   end, { silent = false, expr = true, desc = "llama.nvim inline completion" })
 
   vim.keymap.set("i", config.values.keymap_accept_full, function()

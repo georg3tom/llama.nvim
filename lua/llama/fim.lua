@@ -26,6 +26,7 @@ local fim_data = {
   col = 0,
   line_cur = "",
   content = {},
+  local_ctx = {},
 }
 ---@type number
 local ns_id = vim.api.nvim_create_namespace("fim_ns")
@@ -92,7 +93,7 @@ local function show()
   ring_context.gather_context()
 end
 
-local server_callback = vim.schedule_wrap(function(local_ctx, response)
+local server_callback = vim.schedule_wrap(function(response)
   local ok, data = pcall(vim.fn.json_decode, response.body)
   if not ok then
     logger.warn("Failed to parse JSON response")
@@ -100,7 +101,7 @@ local server_callback = vim.schedule_wrap(function(local_ctx, response)
   end
 
   local content = data.content
-  content = utils.preprocess_content(content, local_ctx.indent)
+  content = utils.preprocess_content(content, fim_data.local_ctx.indent)
 
   if not content then
     fim_data.content = {}
@@ -108,7 +109,7 @@ local server_callback = vim.schedule_wrap(function(local_ctx, response)
     return
   end
 
-  fim_cache:add(local_ctx, content)
+  fim_cache:add(fim_data.local_ctx, content)
   fim_data.content = vim.split(content, "\n", { plain = true })
   show()
 end)
@@ -230,10 +231,10 @@ function M.debounce_complete(use_cache)
   fim_data.line_cur = vim.fn.getline(line)
   fim_data.content = {}
 
-  local local_ctx = utils.get_local_context(line, col)
+  fim_data.local_ctx = utils.get_local_context(line, col)
 
   if use_cache then
-    local cached_result = fim_cache:get_cached_completion(local_ctx)
+    local cached_result = fim_cache:get_cached_completion(fim_data.local_ctx)
     if cached_result then
       fim_data.content = vim.split(cached_result, "\n", { plain = true })
       show()
@@ -241,22 +242,22 @@ function M.debounce_complete(use_cache)
     end
   end
 
-  if M.timer then
-    M.timer:stop()
-    M.timer:close()
+  if timer then
+    timer:stop()
+    timer:close()
+    timer = nil
   end
 
-  M.timer = vim.loop.new_timer()
-  M.timer:start(100, 0, function()
+  timer = vim.loop.new_timer()
+  timer:start(100, 0, function()
     vim.schedule(function()
-      M.complete(local_ctx)
+      M.complete()
     end)
   end)
 end
 
 ---Completes the FIM request, either using cache or making a new request
----@param local_ctx table the local ctx
-function M.complete(local_ctx)
+function M.complete()
   M.hide()
 
   if current_job then
@@ -266,12 +267,12 @@ function M.complete(local_ctx)
 
   local extra_ctx = ring_context.extra_ctx
   local request_body = json({
-    input_prefix = local_ctx.prefix,
-    input_suffix = local_ctx.suffix,
+    input_prefix = fim_data.local_ctx.prefix,
+    input_suffix = fim_data.local_ctx.suffix,
     input_extra = extra_ctx,
-    prompt = local_ctx.middle,
+    prompt = fim_data.local_ctx.middle,
     n_predict = config.values.n_predict,
-    n_indent = local_ctx.indent,
+    n_indent = fim_data.local_ctx.indent,
     top_k = 40,
     top_p = 0.90,
     stream = false,
@@ -297,7 +298,7 @@ function M.complete(local_ctx)
     request_body,
     headers,
     function(response)
-      server_callback(local_ctx, response)
+      server_callback(response)
     end,
     function(err)
       vim.schedule(function()
