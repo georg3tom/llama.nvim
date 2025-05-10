@@ -1,3 +1,9 @@
+---@mod llama.fim Fill-in-Middle (FIM) completion module
+---
+---This module provides functionality for Fill-in-Middle (FIM) code completions.
+---It handles displaying completion hints as virtual text, accepting completions,
+---and managing the HTTP requests to the completion server.
+
 local config = require("llama.config")
 local utils = require("llama.utils")
 local http = require("llama.http")
@@ -13,14 +19,15 @@ ring_context.setup()
 local M = {}
 
 -- Private state
----@type number|nil
-local last_job = nil
----@type number|nil
+---@type number|nil Current HTTP job ID
 local current_job = nil
----@type boolean
+---@type boolean Whether hint is currently shown
 local hint_shown = false
+---@type table LRU cache for FIM completions
 local fim_cache = cache.new(config.values.max_cache_keys)
+---@type userdata|nil Debounce timer
 local timer = nil
+---@type table Current FIM operation data
 local fim_data = {
   line = 0,
   col = 0,
@@ -28,7 +35,7 @@ local fim_data = {
   content = {},
   local_ctx = {},
 }
----@type number
+---@type number Namespace ID for virtual text
 local ns_id = vim.api.nvim_create_namespace("fim_ns")
 
 ---Checks if FIM (Fill-in-Middle) completion can be performed at the given position
@@ -48,12 +55,13 @@ local function can_fim(line, col)
     return false
   end
 
-  -- Ensure cursor is at the end of the line
+  -- NOTE: This code is disabled but kept for potential future use
+  -- Check if cursor is at the end of the line
   -- if col ~= #line_cur then
   --  return false
   -- end
 
-  -- Check if there is a non-space characterin the current line
+  -- Check if there is a non-space character in the current line
   if not hint_shown and line_cur:match("^%s*$") then
     return false
   end
@@ -99,6 +107,8 @@ local function show()
   ring_context.gather_context()
 end
 
+---Callback function for handling HTTP response from the server
+---@param response table The response from the server
 local server_callback = vim.schedule_wrap(function(response)
   local ok, data = pcall(vim.fn.json_decode, response.body)
   if not ok then
@@ -133,11 +143,22 @@ function M.accept(accept_type)
   local line = fim_data.line
   local col = fim_data.col
   local content = fim_data.content
+  
+  if #content == 0 then
+    logger.warn("No content to accept")
+    return
+  end
+  
   local first_line = content[1]
 
   if accept_type == "word" then
     first_line = first_line:match("^(%s*%S+)")
+    if not first_line then
+      logger.warn("No word found to accept")
+      return
+    end
   end
+  
   -- set the current line. default behaviour for accept_type == line
   if first_line then
     vim.api.nvim_buf_set_text(0, line - 1, col, line - 1, col, { first_line })
@@ -219,8 +240,9 @@ local function check_input_match(line, col)
   return true
 end
 
----debounce wrapper around complete()
+---Debounce wrapper around complete() that handles timing and caching
 ---@param use_cache boolean Whether to use cached results if available
+---@see M.complete
 function M.debounce_complete(use_cache)
   -- check if the input matches the current completion
   local line, col = unpack(vim.api.nvim_win_get_cursor(0))
@@ -262,7 +284,8 @@ function M.debounce_complete(use_cache)
   end)
 end
 
----Completes the FIM request, either using cache or making a new request
+---Completes the FIM request by making an HTTP request to the server
+---Handles preparing request body with context, managing HTTP jobs, and error handling
 function M.complete()
   M.hide()
 
@@ -308,7 +331,7 @@ function M.complete()
     end,
     function(err)
       vim.schedule(function()
-        logger.error(err.message)
+        logger.error("Error in FIM HTTP request: " .. (err.message or "unknown error"))
       end)
     end
   )
@@ -324,4 +347,11 @@ function M.hide()
   vim.api.nvim_buf_clear_namespace(0, ns_id, 0, -1)
 end
 
+-- Export module
+---@class LlamaFIM
+---@field can_show boolean Whether FIM hints can be shown
+---@field complete fun() Make FIM completion request to the server
+---@field debounce_complete fun(use_cache: boolean) Debounced FIM completion with caching
+---@field accept fun(accept_type: string) Accept the FIM completion
+---@field hide fun() Hide the FIM hint
 return M
