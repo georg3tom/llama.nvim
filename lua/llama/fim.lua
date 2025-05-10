@@ -54,14 +54,20 @@ local function can_fim(line, col)
   -- end
 
   -- Check if there is a non-space characterin the current line
-  -- if line_cur:match("^%s*$") then
-  --   return false
-  -- end
+  if not hint_shown and line_cur:match("^%s*$") then
+    return false
+  end
 
   return true
 end
 
 local function _can_show()
+  -- check if the cursor has moved while the request was processed
+  local line, col = unpack(vim.api.nvim_win_get_cursor(0))
+  if line ~= fim_data.line or col ~= fim_data.col then
+    return false
+  end
+
   if not M.can_show then
     return false
   end
