@@ -6,6 +6,7 @@ M.values = {
   n_prefix = 256,
   n_suffix = 64,
   n_predict = 128,
+  stop_strings = {},
   t_max_prompt_ms = 500,
   t_max_predict_ms = 1000,
   show_info = 2,

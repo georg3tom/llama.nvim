@@ -21,14 +21,12 @@ function M.create_commands()
     autocmd.remove_autocmds()
   end, {})
   vim.api.nvim_create_user_command("LlamaToggle", function()
-    print(vim.inspect(M))
     if M.enabled then
       M.enabled = false
       autocmd.remove_autocmds()
     else
       M.setup()
     end
-    print(vim.inspect(M))
   end, {})
 end
 

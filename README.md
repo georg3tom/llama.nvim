@@ -56,12 +56,24 @@ require('llama').setup({
     n_prefix = 256,                             -- Lines of context before cursor
     n_suffix = 64,                              -- Lines of context after cursor
     n_predict = 128,                            -- Maximum tokens to predict
+    stop_strings = {},                          -- Strings that stop generation when encountered
     auto_fim = true,                            -- Auto-trigger completion
     max_cache_keys = 250,                       -- Size of the cache
     keymap_trigger = '<C-F>',                   -- Trigger completion keymap
     keymap_accept_full = '<Tab>',               -- Accept full completion
     keymap_accept_line = '<S-Tab>',             -- Accept line completion
     keymap_accept_word = '<C-B>'                -- Accept word completion
+})
+```
+
+### Example: Force Single-Line Completions
+
+To force completions to be single-line only, configure the `stop_strings` option to include a newline character:
+
+```lua
+require('llama').setup({
+    -- Other configuration options
+    stop_strings = { "\n" },
 })
 ```
 

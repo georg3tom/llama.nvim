@@ -143,12 +143,12 @@ function M.accept(accept_type)
   local line = fim_data.line
   local col = fim_data.col
   local content = fim_data.content
-  
+
   if #content == 0 then
     logger.warn("No content to accept")
     return
   end
-  
+
   local first_line = content[1]
 
   if accept_type == "word" then
@@ -158,7 +158,7 @@ function M.accept(accept_type)
       return
     end
   end
-  
+
   -- set the current line. default behaviour for accept_type == line
   if first_line then
     vim.api.nvim_buf_set_text(0, line - 1, col, line - 1, col, { first_line })
@@ -301,6 +301,7 @@ function M.complete()
     input_extra = extra_ctx,
     prompt = fim_data.local_ctx.middle,
     n_predict = config.values.n_predict,
+    stop = config.values.stop_strings,
     n_indent = fim_data.local_ctx.indent,
     top_k = 40,
     top_p = 0.90,
