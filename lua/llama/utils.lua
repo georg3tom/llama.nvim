@@ -1,4 +1,5 @@
 local config = require("llama.config")
+local logger = require("llama.logger")
 
 local M = {}
 
@@ -26,12 +27,10 @@ function M.get_local_context(line, col)
     vim.fn.getline(line + 1, math.min(max_lines, line + config.values.n_suffix))
 
   if line_cur:match("^%s*$") then
-    ctx.indent = 0
     ctx.middle = ""
     line_cur_suffix = ""
-  else
-    ctx.indent = #line_cur:match("^%s*")
   end
+  ctx.indent = #line_cur:match("^%s*")
 
   ctx.prefix = table.concat(lines_prefix, "\n") .. "\n"
   ctx.suffix = line_cur_suffix .. "\n" .. table.concat(lines_suffix, "\n") .. "\n"
@@ -39,10 +38,13 @@ function M.get_local_context(line, col)
   return ctx
 end
 
-function M.preprocess_content(content)
+function M.preprocess_content(content, indent)
   if content == nil or content:match("^%s*$") ~= nil then
     return nil
   end
+  -- assuming the cursor is always indented
+  local pattern = "^" .. string.rep(" ", indent)
+  content = content:gsub(pattern, "")
   -- remove trailing white space
   content = content:gsub("[%s\n]+$", "")
   return content
