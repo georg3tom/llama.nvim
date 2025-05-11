@@ -19,11 +19,25 @@ function M.set_log_level(level_name)
   return false
 end
 
-function M.log(message, level_name)
-  level_name = level_name or "INFO"
-  local level = M.levels[level_name] or M.levels.INFO
+function M.log(level_name, ...)
+  local level = M.levels[level_name or "INFO"] or M.levels.INFO
 
   if level.level >= M.current_level then
+    local args = { ... }
+    local message = ""
+
+    for i, arg in ipairs(args) do
+      if type(arg) == "table" then
+        message = message .. vim.inspect(arg)
+      else
+        message = message .. tostring(arg)
+      end
+
+      if i < #args then
+        message = message .. " "
+      end
+    end
+
     local timestamp = os.date("%Y-%m-%d %H:%M:%S")
     table.insert(M.logs, {
       timestamp = timestamp,
@@ -37,17 +51,20 @@ function M.log(message, level_name)
   end
 end
 
-function M.debug(message)
-  M.log(message, "DEBUG")
+function M.debug(...)
+  M.log("DEBUG", ...)
 end
-function M.info(message)
-  M.log(message, "INFO")
+
+function M.info(...)
+  M.log("INFO", ...)
 end
-function M.warn(message)
-  M.log(message, "WARN")
+
+function M.warn(...)
+  M.log("WARN", ...)
 end
-function M.error(message)
-  M.log(message, "ERROR")
+
+function M.error(...)
+  M.log("ERROR", ...)
 end
 
 function M.get_logs()
@@ -92,10 +109,10 @@ function M.show()
   vim.api.nvim_set_option_value("filetype", "llamalogs", { buf = buf })
 
   local width = math.max(120, vim.o.columns - 8)
-  local height = math.max(30, vim.o.lines - 6)
+  local height = math.max(30, vim.o.lines - 8)
 
-  local row = math.floor((vim.o.lines - height) / 2)
-  local col = math.floor((vim.o.columns - width) / 2)
+  local row = 2
+  local col = 4
 
   local win = vim.api.nvim_open_win(buf, true, {
     relative = "editor",
